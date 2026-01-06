@@ -37,9 +37,9 @@ export async function GET(request: NextRequest) {
         }
         
         // Filter by module
-        const module = searchParams.get('module');
-        if (module) {
-            result = result.filter(t => t.module === module);
+        const moduleParam = searchParams.get('module');
+        if (moduleParam) {
+            result = result.filter(t => t.module === moduleParam);
         }
         
         // Search query

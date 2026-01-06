@@ -42,41 +42,38 @@ export function useAnalytics(options: UseAnalyticsOptions): UseAnalyticsReturn {
     
     // Calculate analytics data
     const analytics = useMemo(() => {
-        setIsCalculating(true);
-        const result = calculateAnalytics(tickets);
-        setIsCalculating(false);
-        return result;
-    }, [tickets, calculationKey]);
+        return calculateAnalytics(tickets);
+    }, [tickets]);
     
     // Get overdue tickets with details
     const overdueTickets = useMemo(() => {
         return getOverdueTicketDetails(tickets);
-    }, [tickets, calculationKey]);
+    }, [tickets]);
     
     // Get upcoming deadline tickets
     const upcomingTickets = useMemo(() => {
         return getUpcomingDeadlineDetails(tickets, upcomingDays);
-    }, [tickets, upcomingDays, calculationKey]);
+    }, [tickets, upcomingDays]);
     
     // Get workload report
     const workloadReport = useMemo(() => {
         return getAssigneeWorkloadReport(tickets);
-    }, [tickets, calculationKey]);
+    }, [tickets]);
     
     // Get priority distribution
     const priorityDistribution = useMemo(() => {
         return getPriorityDistribution(tickets);
-    }, [tickets, calculationKey]);
+    }, [tickets]);
     
     // Get module distribution
     const moduleDistribution = useMemo(() => {
         return getModuleDistribution(tickets);
-    }, [tickets, calculationKey]);
+    }, [tickets]);
     
     // Get status summary
     const statusSummary = useMemo(() => {
         return getStatusSummary(tickets);
-    }, [tickets, calculationKey]);
+    }, [tickets]);
     
     // Get date range report data
     const getDateRangeData = useCallback((startDate: string, endDate: string) => {

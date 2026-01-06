@@ -11,11 +11,51 @@ import { transformTicket, transformTicketList, toBackendCreateTicket, toBackendU
 // For development fallback - import mock data
 import { initialTickets } from '@/data/tickets';
 
+// Data source configuration
+// Options: 'dummy' (only tickets.ts), 'llm' (only tickets2.ts), 'combined' (both)
+const DATA_SOURCE_MODE = process.env.NEXT_PUBLIC_DATA_SOURCE || 'combined';
+
+// Function to safely load LLM-parsed tickets
+function loadLLMTickets(): Ticket[] {
+    try {
+        // This will work at runtime but TypeScript might complain
+        const tickets2Module = require('@/data/tickets2');
+        return tickets2Module.llmParsedTickets || [];
+    } catch (error) {
+        // tickets2.ts not available, return empty array
+        console.log('ℹ️ tickets2.ts not found, using only initial tickets');
+        return [];
+    }
+}
+
+// Load tickets based on configuration
+function loadTickets(): Ticket[] {
+    const llmTickets = loadLLMTickets();
+
+    switch (DATA_SOURCE_MODE) {
+        case 'dummy':
+            console.log('📊 Using DUMMY data mode (tickets.ts only)');
+            return [...initialTickets];
+
+        case 'llm':
+            console.log('🤖 Using LLM data mode (tickets2.ts only)');
+            return [...llmTickets];
+
+        case 'combined':
+        default:
+            console.log('🔄 Using COMBINED data mode (tickets.ts + tickets2.ts)');
+            return [...initialTickets, ...llmTickets];
+    }
+}
+
+// Load LLM tickets safely
+const llmParsedTickets = loadLLMTickets();
+
 // Flag to use mock data (set to false to use real backend)
 const USE_MOCK_DATA = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
 
-// Local mutable copy of tickets for mock mode
-let mockTickets: Ticket[] = [...initialTickets];
+// Load tickets based on data source configuration
+let mockTickets: Ticket[] = loadTickets();
 
 /**
  * Get all tickets from backend

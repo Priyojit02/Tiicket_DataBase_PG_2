@@ -36,11 +36,11 @@ export default function DashboardPage() {
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
                     <p className="text-gray-500 mt-1">
-                        Overview of your ticket management system
+                        Overview of your Ticket Management System
                     </p>
                 </div>
                 <Link
-                    href="/tickets"
+                    href="/tickets/new"
                     className="inline-flex items-center gap-2 px-4 py-2 bg-[#D04A02] text-white rounded-lg hover:bg-[#b84102] transition-colors"
                 >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -9,7 +9,11 @@ import { AuthState, User } from '@/types';
 const msalConfig: Configuration = {
     auth: {
         clientId: process.env.NEXT_PUBLIC_AZURE_CLIENT_ID || "033bcde2-d023-405e-8f84-ef33902bfb94",
-        authority: `https://login.microsoftonline.com/${process.env.NEXT_PUBLIC_AZURE_TENANT_ID || "513294a0-3e20-41b2-a970-6d30bf1546fa"}`,
+        // Use 'organizations' to allow any Azure AD tenant (multi-tenant)
+        // Use specific tenant ID if you want single-tenant only
+        authority: process.env.NEXT_PUBLIC_AZURE_TENANT_ID 
+            ? `https://login.microsoftonline.com/${process.env.NEXT_PUBLIC_AZURE_TENANT_ID}`
+            : "https://login.microsoftonline.com/organizations",
         redirectUri: typeof window !== 'undefined' ? window.location.origin : "http://localhost:3000",
         postLogoutRedirectUri: typeof window !== 'undefined' ? window.location.origin : "http://localhost:3000",
     },

@@ -250,8 +250,8 @@ export function getModuleDistribution(tickets: Ticket[]): {
     const moduleCount: Record<string, number> = {};
     
     tickets.forEach(ticket => {
-        const module = ticket.module || 'Other';
-        moduleCount[module] = (moduleCount[module] || 0) + 1;
+        const ticketModule = ticket.module || 'Other';
+        moduleCount[ticketModule] = (moduleCount[ticketModule] || 0) + 1;
     });
     
     return Object.entries(moduleCount)
