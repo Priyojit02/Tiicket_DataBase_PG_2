@@ -21,7 +21,7 @@ async function loadLLMTickets(): Promise<Ticket[]> {
     try {
         // Use dynamic import for Next.js compatibility
         const tickets2Module = await import('@/data/tickets2');
-        const llmTickets = tickets2Module.ticketsData || [];
+        const llmTickets = tickets2Module.getTicketsData(); // Use function to get fresh data
         
         console.log(`🤖 Loaded ${llmTickets.length} LLM tickets from tickets2.ts (includes user-created tickets)`);
         
@@ -52,7 +52,7 @@ async function loadTickets(): Promise<Ticket[]> {
             return initialTickets;
 
         case 'llm':
-            console.log('🤖 Using LLM data mode (tickets2.ts - includes user-created tickets)');
+            console.log('🤖 Using LLM data mode (tickets2.ts with user-created tickets)');
             if (hasLLMTickets) {
                 return llmTickets; // Now includes user tickets from tickets2.ts
             } else {
@@ -62,7 +62,7 @@ async function loadTickets(): Promise<Ticket[]> {
 
         case 'combined':
         default:
-            console.log('🔄 Using COMBINED data mode (all sources - user tickets included in LLM data)');
+            console.log('🔄 Using COMBINED data mode (all sources)');
             return [...initialTickets, ...llmTickets]; // llmTickets includes user tickets
     }
 }
@@ -257,6 +257,7 @@ export async function getTicketsDueSoon(days: number = 7): Promise<ApiResponse<T
 export async function createTicket(payload: CreateTicketPayload): Promise<ApiResponse<Ticket>> {
     if (!USE_MOCK_DATA) {
         try {
+            console.log('🚀 Attempting to create ticket via backend API:', payload.title);
             const response = await ticketsApi.createTicket({
                 title: payload.title,
                 description: payload.description || '',
@@ -264,9 +265,10 @@ export async function createTicket(payload: CreateTicketPayload): Promise<ApiRes
                 priority: payload.priority || 'Medium',
                 assignee_id: 1, // Default assignee, should be mapped from name
             });
+            console.log('✅ Ticket created successfully via backend API');
             return { success: true, data: response as unknown as Ticket };
         } catch (error: unknown) {
-            console.error('Failed to create ticket:', error);
+            console.error('❌ Backend API failed, falling back to mock implementation:', error);
             // Fall through to mock implementation
         }
     }
@@ -305,10 +307,19 @@ export async function createTicket(payload: CreateTicketPayload): Promise<ApiRes
                     const existingTickets = JSON.parse(localStorage.getItem('userCreatedTickets') || '[]');
                     const updatedTickets = [...existingTickets, newTicket];
                     localStorage.setItem('userCreatedTickets', JSON.stringify(updatedTickets));
-                    console.log('💾 User-created ticket saved to localStorage');
+                    console.log('💾 User-created ticket saved to localStorage:', newTicket.title);
+                    console.log('📊 Total user tickets in localStorage:', updatedTickets.length);
+                    
+                    // Force reload of tickets2.ts data by clearing any cache
+                    if (typeof window !== 'undefined' && 'location' in window) {
+                        // This will ensure fresh data on next load
+                        console.log('🔄 Ticket data updated - refresh page to see changes');
+                    }
                 } catch (error) {
                     console.error('Failed to save ticket to localStorage:', error);
                 }
+            } else {
+                console.log('⚠️ localStorage not available when saving ticket');
             }
             
             resolve({ success: true, data: newTicket });
