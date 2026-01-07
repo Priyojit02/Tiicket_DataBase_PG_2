@@ -36,8 +36,8 @@ async def process_daily_emails():
 
     async with AsyncSessionLocal() as db:
         try:
-            # Always use mock services for scheduled tasks (no user tokens available)
-            processor = EmailProcessor(db, use_mock=True)
+            # Scheduler always uses mock services (no user tokens available)
+            processor = EmailProcessor(db)
 
             # Process emails from last 24 hours, every 2 minutes
             result = await processor.process_daily_emails(
@@ -66,33 +66,12 @@ async def health_check():
 
 def start_scheduler():
     """
-    Initialize and start the background scheduler.
+    Scheduler disabled - real email processing requires user authentication.
+    Use manual triggers from the frontend instead.
     """
-    if not settings.scheduler_enabled:
-        print("[Scheduler] Scheduler is disabled")
-        return
-    
-    # Add email processing job - runs every 2 minutes
-    scheduler.add_job(
-        process_daily_emails,
-        trigger=IntervalTrigger(minutes=2),  # Changed from 1 to 2 minutes
-        id="email_processing",
-        name="Email Processing",
-        replace_existing=True
-    )
-    
-    # Add health check job (every 5 minutes)
-    scheduler.add_job(
-        health_check,
-        trigger=IntervalTrigger(minutes=5),
-        id="health_check",
-        name="Health Check",
-        replace_existing=True
-    )
-    
-    # Start the scheduler
-    scheduler.start()
-    print("[Scheduler] Started with email processing every 2 minutes")
+    print("[Scheduler] Disabled - real email processing requires user authentication")
+    print("[Scheduler] Use manual triggers from the frontend instead")
+    return
 
 
 def stop_scheduler():

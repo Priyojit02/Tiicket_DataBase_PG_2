@@ -99,11 +99,6 @@ class Settings(BaseSettings):
         )
     
     @property
-    def should_use_mock_services(self) -> bool:
-        """Determine if mock services should be used (when LLM not configured)"""
-        return not self.is_llm_configured
-    
-    @property
     def is_development(self) -> bool:
         return self.app_env == "development"
     

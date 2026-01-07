@@ -34,7 +34,7 @@ async def demonstrate_complete_flow():
         print("2️⃣ FETCHING & PROCESSING EMAILS FROM SSO...")
         print("   📧 Simulating email fetch from Microsoft Graph API...")
 
-        processor = EmailProcessor(db, use_mock=True)  # Use mock for demo
+        processor = EmailProcessor(db)  # Always live now
         result = await processor.process_daily_emails(
             days_back=2,
             max_emails=6,

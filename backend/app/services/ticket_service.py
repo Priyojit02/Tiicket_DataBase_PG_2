@@ -163,6 +163,7 @@ class TicketService:
                     'module': ticket.category.value if ticket.category else 'OTHER',
                     'tags': ['email-parsed', 'llm-generated'] if ticket.source_email_id else ['manual'],
                     'source_email_id': ticket.source_email_id,  # Include for filtering
+                    'created_by': ticket.created_by,  # Include for filtering manual tickets
                     'logs': [{
                         'id': 1,
                         'action': 'ticket_created',
@@ -180,8 +181,8 @@ class TicketService:
             print(f"Error exporting tickets to frontend format: {e}")
             return []
     
-    async def update_frontend_tickets_file(self):
-        """Update the tickets2.ts file with current database tickets based on DATA_SOURCE_MODE"""
+    async def  update_frontend_tickets_file(self):
+        """Update the tickets2.ts file with current database tickets ba sed on DATA_SOURCE_MODE"""
         try:
             import json
             import os
@@ -192,13 +193,13 @@ class TicketService:
             
             # Filter tickets based on DATA_SOURCE_MODE
             if settings.data_source_mode == "llm":
-                # Only LLM-parsed tickets (those with source_email_id)
-                filtered_tickets = [t for t in all_tickets if t.get('source_email_id')]
+                # LLM-parsed tickets (those with source_email_id) OR manually created tickets (have created_by)
+                filtered_tickets = [t for t in all_tickets if t.get('source_email_id') or t.get('created_by')]
             elif settings.data_source_mode == "combined":
                 # All tickets (both dummy and LLM)
                 filtered_tickets = all_tickets
             elif settings.data_source_mode == "dummy":
-                # Only dummy tickets (those without source_email_id)
+                # Only manually created tickets (those without source_email_id)
                 filtered_tickets = [t for t in all_tickets if not t.get('source_email_id')]
             else:
                 # Default to combined
@@ -206,9 +207,9 @@ class TicketService:
             
             # Create the TypeScript content
             mode_description = {
-                "llm": "LLM-parsed tickets only",
+                "llm": "LLM-parsed tickets + manual user tickets",
                 "combined": "Combined dummy + LLM tickets", 
-                "dummy": "Dummy/sample tickets only"
+                "dummy": "Manual user tickets only"
             }.get(settings.data_source_mode, "Combined mode")
             
             ts_content = f"""// ============================================

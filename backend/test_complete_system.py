@@ -28,7 +28,7 @@ async def test_complete_system():
     print("1️⃣ CONFIGURATION CHECK")
     print(f"   Backend DATA_SOURCE_MODE: {settings.data_source_mode}")
     print(f"   LLM Configured: {settings.is_llm_configured}")
-    print(f"   Using Mock Services: {settings.should_use_mock_services}")
+    print(f"   Services: LIVE (no mock)")
     print(f"   Scheduler Enabled: {settings.scheduler_enabled}")
     print()
 
@@ -41,7 +41,7 @@ async def test_complete_system():
     async with AsyncSessionLocal() as db:
         # Step 3: Process emails (simulating scheduler)
         print("3️⃣ EMAIL PROCESSING (Mock Mode)")
-        processor = EmailProcessor(db, use_mock=True)
+        processor = EmailProcessor(db)
         result = await processor.process_daily_emails(
             days_back=1,
             max_emails=8,

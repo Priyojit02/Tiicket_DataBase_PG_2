@@ -24,7 +24,7 @@ async def test_data_source_control():
     async with AsyncSessionLocal() as db:
         # Step 2: Process some mock emails to create LLM tickets
         print("\n📧 Processing mock emails to create LLM tickets...")
-        processor = EmailProcessor(db, use_mock=True)
+        processor = EmailProcessor(db)
         result = await processor.process_daily_emails(
             days_back=3,
             max_emails=5,

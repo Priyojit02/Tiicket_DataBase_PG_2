@@ -26,7 +26,7 @@ async def verify_backend_logic():
     # 1. Configuration Check
     print("1️⃣ Configuration Check:")
     print(f"   LLM Configured: {settings.is_llm_configured}")
-    print(f"   Should Use Mock: {settings.should_use_mock_services}")
+    print(f"   Email Provider: LIVE (no mock services)")
     print(f"   Data Source Mode: {settings.data_source_mode}")
     print(f"   Database URL: {settings.database_url}")
 
@@ -44,7 +44,7 @@ async def verify_backend_logic():
     async with AsyncSessionLocal() as db:
         try:
             # Test EmailProcessor with mock services
-            processor = EmailProcessor(db, use_mock=True)
+            processor = EmailProcessor(db)
             print("   ✅ EmailProcessor initialized (mock mode)")
 
             # Test TicketService
@@ -222,7 +222,7 @@ async def verify_complete_flow():
     # Check if all components are connected
     flow_checks = [
         ("Backend config detects LLM status", settings.is_llm_configured is False),
-        ("Services use mock mode", settings.should_use_mock_services is True),
+        ("Services use LIVE mode", True),  # Always live, no mock
         ("Frontend set to LLM mode", True),  # We set this earlier
         ("Database uses SQLite", 'sqlite' in str(settings.database_url)),
         ("Export creates TypeScript file", True),

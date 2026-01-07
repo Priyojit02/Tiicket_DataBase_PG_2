@@ -21,9 +21,8 @@ class EmailController:
     
     def __init__(self, db: AsyncSession):
         self.db = db
-        # Automatically use mock services if LLM not configured
-        use_mock = settings.should_use_mock_services
-        self.email_processor = EmailProcessor(db, use_mock=use_mock)
+        # Always use real services
+        self.email_processor = EmailProcessor(db)
         self.email_service = EmailService(db)
     
     async def trigger_email_fetch(

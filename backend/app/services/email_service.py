@@ -135,6 +135,17 @@ class EmailService:
             print(f"Error fetching emails from Microsoft Graph: {e}")
             raise
     
+    async def fetch_emails(
+        self,
+        days_back: int = 1,
+        max_emails: int = 100
+    ) -> List[EmailSourceResponse]:
+        """This method requires an access token. Use fetch_emails_with_token() instead."""
+        raise NotImplementedError(
+            "EmailService.fetch_emails() requires an access token. "
+            "Use fetch_emails_with_token(access_token, ...) instead."
+        )
+    
     async def get_email_by_id(
         self,
         access_token: str,
@@ -208,48 +219,3 @@ class EmailService:
         """Get emails by detected category"""
         emails = await self.email_repo.get_by_category(category, skip, limit)
         return [EmailSourceResponse.model_validate(e) for e in emails]
-
-
-class MockEmailService(EmailService):
-    """
-    Mock email service for development/testing
-    Returns simulated email data without actual IMAP connection
-    """
-    
-    async def fetch_emails(
-        self,
-        days_back: int = 1,
-        max_emails: int = 100
-    ) -> List[EmailSourceResponse]:
-        """Return mock emails for testing"""
-        mock_emails = [
-            {
-                "message_id": f"mock_{datetime.utcnow().timestamp()}_{i}",
-                "from_address": f"user{i}@example.com",
-                "to_address": settings.email_address,
-                "subject": f"SAP MM Issue - Purchase Order {1000 + i}",
-                "body_text": f"We are experiencing issues with purchase order {1000 + i}. The goods receipt is not posting correctly in MM module.",
-                "body_html": None,
-                "received_at": datetime.utcnow() - timedelta(hours=i)
-            }
-            for i in range(min(5, max_emails))
-        ]
-        
-        fetched = []
-        for email_data in mock_emails:
-            if await self.email_repo.message_exists(email_data["message_id"]):
-                continue
-            
-            email_source = await self.email_repo.create({
-                "message_id": email_data["message_id"],
-                "from_address": email_data["from_address"],
-                "to_address": email_data["to_address"],
-                "subject": email_data["subject"],
-                "body_text": email_data["body_text"],
-                "body_html": email_data["body_html"],
-                "received_at": email_data["received_at"]
-            })
-            
-            fetched.append(EmailSourceResponse.model_validate(email_source))
-        
-        return fetched

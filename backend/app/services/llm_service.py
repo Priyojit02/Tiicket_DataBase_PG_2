@@ -408,15 +408,13 @@ class LLMService:
     def __init__(self, db: AsyncSession, provider: str = None, model: str = None):
         self.db = db
         
-        # Check if LLM is properly configured
-        if not settings.is_llm_configured:
-            raise ValueError(
-                "LLM service requires proper API key configuration. "
-                "Please set LLM_API_KEY in your .env file or use MockLLMService for testing."
-            )
-        
-        self.llm_provider = get_llm_provider(provider=provider, model=model)
-        print(f"LLM Service initialized: {self.llm_provider.provider_name} ({self.llm_provider.model})")
+        # Always try to use LLM, fallback to keyword analysis if not configured
+        try:
+            self.llm_provider = get_llm_provider(provider=provider, model=model)
+            print(f"LLM Service initialized: {self.llm_provider.provider_name} ({self.llm_provider.model})")
+        except Exception as e:
+            print(f"LLM not configured ({e}), will use keyword-based analysis")
+            self.llm_provider = None
     
     async def analyze_email(
         self,
@@ -433,6 +431,10 @@ class LLMService:
         5. Key points
         """
         try:
+            # Check if LLM is available
+            if self.llm_provider is None:
+                return await self._keyword_based_analysis(subject, body)
+            
             # Build the prompt
             prompt = self._build_analysis_prompt(subject, body, from_address)
             
@@ -557,31 +559,4 @@ Determine if this is SAP-related, classify the module, assess priority, and sugg
         return AVAILABLE_MODELS.get(provider.lower(), [])
 
 
-class MockLLMService:
-    """Mock LLM service for development/testing without API calls"""
-    
-    def __init__(self, db: AsyncSession):
-        self.db = db
-    
-    async def analyze_email(self, subject: str, body: str, from_address: str) -> EmailAnalysisResult:
-        """Return mock analysis for testing"""
-        text = f"{subject} {body}".lower()
-        is_sap = any(kw in text for kw in ["sap", "abap", "fiori", "hana"])
-        
-        category = TicketCategoryEnum.OTHER
-        if "material" in text or "purchase" in text:
-            category = TicketCategoryEnum.MM
-        elif "sales" in text or "customer" in text:
-            category = TicketCategoryEnum.SD
-        elif "finance" in text or "accounting" in text:
-            category = TicketCategoryEnum.FICO
-        
-        return EmailAnalysisResult(
-            is_sap_related=is_sap,
-            confidence=0.8 if is_sap else 0.2,
-            detected_category=category if is_sap else None,
-            suggested_title=f"Support: {subject[:50]}",
-            suggested_priority=TicketPriorityEnum.MEDIUM,
-            key_points=["Mock analysis", "Testing mode"],
-            raw_response={"mock": True}
-        )
+

@@ -48,7 +48,7 @@ async def test_email_processing_pipeline():
         print("\n📧 Step 3: Testing Email Processing...")
         async with AsyncSessionLocal() as db:
             # Use mock processor for testing
-            processor = EmailProcessor(db, use_mock=True)
+            processor = EmailProcessor(db)
 
             print("   Processing mock emails...")
             result = await processor.process_daily_emails(

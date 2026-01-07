@@ -14,7 +14,7 @@ async def test_flow():
 
     async with AsyncSessionLocal() as db:
         # Process emails
-        processor = EmailProcessor(db, use_mock=True)
+        processor = EmailProcessor(db)
         result = await processor.process_daily_emails(
             days_back=2,
             max_emails=4,

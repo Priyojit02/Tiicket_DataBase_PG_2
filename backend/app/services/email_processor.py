@@ -6,8 +6,8 @@ from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 
-from app.services.email_service import EmailService, MockEmailService
-from app.services.llm_service import LLMService, MockLLMService
+from app.services.email_service import EmailService
+from app.services.llm_service import LLMService
 from app.services.ticket_service import TicketService
 from app.repositories import UserRepository, EmailRepository
 from app.models import TicketCategory, TicketPriority
@@ -22,17 +22,12 @@ class EmailProcessor:
     3. Create tickets for SAP-related emails
     """
     
-    def __init__(self, db: AsyncSession, use_mock: bool = False):
+    def __init__(self, db: AsyncSession):
         self.db = db
-        self.use_mock = use_mock
         
-        # Initialize services based on mode
-        if use_mock:
-            self.email_service = MockEmailService(db)
-            self.llm_service = MockLLMService(db)
-        else:
-            self.email_service = EmailService(db)
-            self.llm_service = LLMService(db)
+        # Always use real services
+        self.email_service = EmailService(db)
+        self.llm_service = LLMService(db)
         
         self.ticket_service = TicketService(db)
         self.user_repo = UserRepository(db)
@@ -191,18 +186,10 @@ class EmailProcessor:
             )
         except Exception as e:
             print(f"LLM analysis failed for email {email_id}: {e}")
-            # Fall back to keyword-based analysis if LLM fails
-            if not self.use_mock:
-                from app.services.llm_service import MockLLMService
-                mock_llm = MockLLMService(self.db)
-                analysis = await mock_llm.analyze_email(
-                    subject=subject,
-                    body=body,
-                    from_address=from_address
-                )
-                print(f"Using fallback keyword analysis for email {email_id}")
-            else:
-                raise  # Re-raise if already using mock services
+            # LLMService already has built-in keyword fallback
+            # If LLM completely fails, skip this email
+            print(f"Skipping email {email_id} due to analysis failure")
+            return None
         
         result["is_sap_related"] = analysis.is_sap_related
         result["category"] = analysis.detected_category.value if analysis.detected_category else None
