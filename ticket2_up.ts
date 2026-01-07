@@ -8,21 +8,30 @@
 
 import { Ticket } from '@/types';
 
-// Load static LLM tickets
+// Static LLM tickets from backend
 const staticTickets: Ticket[] = [];
 
-// Load user-created tickets from localStorage (treated as LLM tickets)
-let userCreatedTickets: Ticket[] = [];
-if (typeof window !== 'undefined') {
+// Function to load user-created tickets from localStorage
+function loadUserCreatedTickets(): Ticket[] {
+    if (typeof window === 'undefined') {
+        return []; // Server-side, no localStorage
+    }
+
     try {
         const stored = localStorage.getItem('userCreatedTickets');
-        if (stored) {
-            userCreatedTickets = JSON.parse(stored);
-        }
+        return stored ? JSON.parse(stored) : [];
     } catch (error) {
         console.error('Failed to load user tickets from localStorage:', error);
+        return [];
     }
 }
 
-// Combine static tickets with user-created tickets
-export const ticketsData: Ticket[] = [...staticTickets, ...userCreatedTickets];
+// Export function that loads data dynamically
+export function getTicketsData(): Ticket[] {
+    const userTickets = loadUserCreatedTickets();
+    return [...staticTickets, ...userTickets];
+}
+
+// For backward compatibility, also export the data directly
+// This will be empty on server-side, but populated on client-side
+export const ticketsData: Ticket[] = typeof window !== 'undefined' ? getTicketsData() : [];
