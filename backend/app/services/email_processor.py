@@ -107,6 +107,63 @@ class EmailProcessor:
         except Exception as e:
             print(f"Email processing error: {e}")
             raise
+        
+        finally:
+            # Always update frontend tickets file after processing
+            try:
+                await self.ticket_service.update_frontend_tickets_file()
+            except Exception as e:
+                print(f"Warning: Failed to update frontend tickets file: {e}")
+    
+    async def process_emails(
+        self,
+        emails: List,
+        auto_create_tickets: bool = True,
+        created_by_user_id: int = None
+    ) -> dict:
+        """
+        Process a list of already fetched emails
+        Used by the controller when emails are fetched via API
+        """
+        stats = {
+            "analyzed": 0,
+            "sap_related": 0,
+            "tickets_created": 0,
+            "errors": 0,
+            "skipped": 0
+        }
+        
+        for email in emails:
+            try:
+                # Email is already stored, just process it
+                result = await self._process_single_email(
+                    email_id=email.id,
+                    subject=email.subject,
+                    body=email.body_text or "",
+                    from_address=email.from_address,
+                    auto_create_ticket=auto_create_tickets
+                )
+                
+                stats["analyzed"] += 1
+                
+                if result.get("is_sap_related"):
+                    stats["sap_related"] += 1
+                    if result.get("ticket_created"):
+                        stats["tickets_created"] += 1
+                else:
+                    stats["skipped"] += 1
+                    
+            except Exception as e:
+                print(f"Error processing email {email.id}: {e}")
+                stats["errors"] += 1
+        
+        # Update frontend tickets file after processing
+        try:
+            await self.ticket_service.update_frontend_tickets_file()
+        except Exception as e:
+            print(f"Warning: Failed to update frontend tickets file: {e}")
+        
+        return stats
     
     async def _process_single_email(
         self,
@@ -126,11 +183,26 @@ class EmailProcessor:
         }
         
         # Analyze with LLM
-        analysis = await self.llm_service.analyze_email(
-            subject=subject,
-            body=body,
-            from_address=from_address
-        )
+        try:
+            analysis = await self.llm_service.analyze_email(
+                subject=subject,
+                body=body,
+                from_address=from_address
+            )
+        except Exception as e:
+            print(f"LLM analysis failed for email {email_id}: {e}")
+            # Fall back to keyword-based analysis if LLM fails
+            if not self.use_mock:
+                from app.services.llm_service import MockLLMService
+                mock_llm = MockLLMService(self.db)
+                analysis = await mock_llm.analyze_email(
+                    subject=subject,
+                    body=body,
+                    from_address=from_address
+                )
+                print(f"Using fallback keyword analysis for email {email_id}")
+            else:
+                raise  # Re-raise if already using mock services
         
         result["is_sap_related"] = analysis.is_sap_related
         result["category"] = analysis.detected_category.value if analysis.detected_category else None

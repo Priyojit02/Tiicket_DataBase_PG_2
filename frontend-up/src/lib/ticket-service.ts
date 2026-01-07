@@ -12,15 +12,16 @@ import { transformTicket, transformTicketList, toBackendCreateTicket, toBackendU
 import { initialTickets } from '@/data/tickets';
 
 // Data source configuration
-// Options: 'dummy' (only tickets.ts), 'llm' (only tickets2.ts), 'combined' (both)
-const DATA_SOURCE_MODE = process.env.NEXT_PUBLIC_DATA_SOURCE || 'combined';
+// Now controlled by .env USE_DB variable
+// Options: 'llm' (only tickets2.ts), 'normal' (only tickets.ts), 'combined' (both)
+// Controlled by frontend-up/.env.local USE_DB variable
 
 // Function to safely load LLM-parsed tickets
 function loadLLMTickets(): Ticket[] {
     try {
         // This will work at runtime but TypeScript might complain
         const tickets2Module = require('@/data/tickets2');
-        return tickets2Module.llmParsedTickets || [];
+        return tickets2Module.ticketsData || [];
     } catch (error) {
         // tickets2.ts not available, return empty array
         console.log('ℹ️ tickets2.ts not found, using only initial tickets');
@@ -28,22 +29,50 @@ function loadLLMTickets(): Ticket[] {
     }
 }
 
-// Load tickets based on configuration
+// Get current data source mode from .env
+export function getCurrentDataSource(): 'normal' | 'llm' | 'combined' {
+    return (process.env.USE_DB as 'normal' | 'llm' | 'combined') || 'combined';
+}
+
+// Load tickets based on .env configuration
 function loadTickets(): Ticket[] {
     const llmTickets = loadLLMTickets();
-
-    switch (DATA_SOURCE_MODE) {
-        case 'dummy':
-            console.log('📊 Using DUMMY data mode (tickets.ts only)');
+    const hasLLMTickets = llmTickets.length > 0;
+    
+    // Get data source mode from .env
+    const dataSourceMode = process.env.USE_DB || 'combined';
+    
+    switch (dataSourceMode) {
+        case 'normal':
+            console.log('📊 Using NORMAL data mode (tickets.ts only)');
             return [...initialTickets];
 
         case 'llm':
             console.log('🤖 Using LLM data mode (tickets2.ts only)');
-            return [...llmTickets];
+            if (hasLLMTickets) {
+                return [...llmTickets];
+            } else {
+                console.log('⚠️ No LLM tickets found, falling back to normal data');
+                return [...initialTickets];
+            }
 
         case 'combined':
         default:
             console.log('🔄 Using COMBINED data mode (tickets.ts + tickets2.ts)');
+            return [...initialTickets, ...llmTickets];
+    }
+}
+            console.log('🤖 Using LLM data mode (user preference)');
+            if (hasLLMTickets) {
+                return [...llmTickets];
+            } else {
+                console.log('⚠️ No LLM tickets found, falling back to dummy data');
+                return [...initialTickets];
+            }
+
+        case 'combined':
+        default:
+            console.log('🔄 Using COMBINED data mode (user preference)');
             return [...initialTickets, ...llmTickets];
     }
 }

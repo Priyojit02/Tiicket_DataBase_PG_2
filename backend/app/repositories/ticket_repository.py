@@ -172,6 +172,18 @@ class TicketRepository(BaseRepository[Ticket]):
         )
         return list(result.scalars().all())
     
+    async def get_all_with_details(self) -> List[Ticket]:
+        """Get all tickets with user details for frontend export"""
+        result = await self.db.execute(
+            select(Ticket)
+            .options(
+                selectinload(Ticket.created_by_user),
+                selectinload(Ticket.assigned_to_user),
+            )
+            .order_by(desc(Ticket.created_at))
+        )
+        return list(result.scalars().all())
+    
     async def update_status(
         self,
         ticket_id: int,

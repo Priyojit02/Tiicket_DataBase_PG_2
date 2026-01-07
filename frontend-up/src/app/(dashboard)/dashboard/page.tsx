@@ -11,6 +11,7 @@ import { useTickets } from '@/hooks/useTickets';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { StatsCard, Card, CardHeader, CardTitle, CardContent, StatusBadge, PriorityBadge } from '@/components/ui';
 import { formatDate, getDaysLabel } from '@/lib/utils';
+import { getCurrentDataSource } from '@/lib/ticket-service';
 
 export default function DashboardPage() {
     const { tickets, isLoading } = useTickets();
@@ -20,6 +21,22 @@ export default function DashboardPage() {
         upcomingTickets,
         statusSummary 
     } = useAnalytics({ tickets });
+    
+    const currentDataSource = getCurrentDataSource();
+    
+    const getDataSourceInfo = () => {
+        switch (currentDataSource) {
+            case 'normal':
+                return { label: 'Sample Data', color: 'bg-gray-100 text-gray-800', icon: '📊' };
+            case 'llm':
+                return { label: 'LLM Data', color: 'bg-blue-100 text-blue-800', icon: '🤖' };
+            case 'combined':
+            default:
+                return { label: 'Combined Data', color: 'bg-green-100 text-green-800', icon: '🔄' };
+        }
+    };
+    
+    const dataSourceInfo = getDataSourceInfo();
     
     if (isLoading) {
         return (
@@ -33,11 +50,24 @@ export default function DashboardPage() {
         <div className="space-y-6">
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-                    <p className="text-gray-500 mt-1">
-                        Overview of your Ticket Management System
-                    </p>
+                <div className="flex items-center gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+                        <p className="text-gray-500 mt-1">
+                            Overview of your Ticket Management System
+                        </p>
+                    </div>
+                    <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${dataSourceInfo.color}`}>
+                        <span>{dataSourceInfo.icon}</span>
+                        <span>{dataSourceInfo.label}</span>
+                        <Link 
+                            href="/settings" 
+                            className="ml-1 text-xs underline hover:no-underline"
+                            title="Change data source in settings"
+                        >
+                            ⚙️
+                        </Link>
+                    </div>
                 </div>
                 <Link
                     href="/tickets/new"

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 
 from app.core.config import settings
-from app.core.database import AsyncSessionLocal
+from app.core.database import AsyncSessionLocal, init_db
 from app.services import EmailProcessor
 
 
@@ -19,30 +19,42 @@ scheduler = AsyncIOScheduler()
 
 async def process_daily_emails():
     """
-    Scheduled task to fetch and process daily emails.
-    Runs every day at configured time.
+    Scheduled task to fetch and process emails from last 24 hours.
+    Runs every 2 minutes to continuously monitor for SAP-related emails.
+    Uses mock data in scheduler (real emails require user authentication).
     """
-    print(f"[Scheduler] Starting daily email processing at {datetime.utcnow()}")
-    
+    print(f"[Scheduler] Starting email processing at {datetime.utcnow()}")
+    print("[Scheduler] Processing emails from last 24 hours (mock data)")
+
+    # Ensure database is initialized
+    try:
+        await init_db()
+        print("[Scheduler] Database initialized")
+    except Exception as e:
+        print(f"[Scheduler] Database initialization failed: {e}")
+        return
+
     async with AsyncSessionLocal() as db:
         try:
-            # Use mock services based on settings
-            use_mock = settings.debug
-            processor = EmailProcessor(db, use_mock=use_mock)
-            
+            # Always use mock services for scheduled tasks (no user tokens available)
+            processor = EmailProcessor(db, use_mock=True)
+
+            # Process emails from last 24 hours, every 2 minutes
             result = await processor.process_daily_emails(
-                days_back=1,
-                max_emails=100,
+                days_back=1,  # 24 hours
+                max_emails=20,  # Reasonable limit for frequent processing
                 auto_create_tickets=True
             )
-            
+
             await db.commit()
-            
+
             print(f"[Scheduler] Email processing completed: {result}")
-            
+            if result.get('tickets_created', 0) > 0:
+                print(f"[Scheduler] ✅ Created {result['tickets_created']} new tickets")
+
         except Exception as e:
             await db.rollback()
-            print(f"[Scheduler] Email processing error: {e}")
+            print(f"[Scheduler] Error: {e}")
 
 
 async def health_check():
@@ -60,16 +72,12 @@ def start_scheduler():
         print("[Scheduler] Scheduler is disabled")
         return
     
-    # Add daily email processing job
-    # Default: Run at 8:00 AM UTC every day
+    # Add email processing job - runs every 2 minutes
     scheduler.add_job(
         process_daily_emails,
-        trigger=CronTrigger(
-            hour=settings.scheduler_email_hour,
-            minute=settings.scheduler_email_minute
-        ),
-        id="daily_email_processing",
-        name="Daily Email Processing",
+        trigger=IntervalTrigger(minutes=2),  # Changed from 1 to 2 minutes
+        id="email_processing",
+        name="Email Processing",
         replace_existing=True
     )
     
@@ -84,7 +92,7 @@ def start_scheduler():
     
     # Start the scheduler
     scheduler.start()
-    print(f"[Scheduler] Started with email processing at {settings.scheduler_email_hour}:{settings.scheduler_email_minute:02d} UTC")
+    print("[Scheduler] Started with email processing every 2 minutes")
 
 
 def stop_scheduler():

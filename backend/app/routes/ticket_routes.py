@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.controllers import TicketController
-from app.middleware import get_current_user
+from app.middleware import get_current_user, get_token
 from app.schemas import (
     TicketCreate,
     TicketUpdate,
@@ -51,13 +51,29 @@ async def get_tickets(
     search: Optional[str] = None,
     order_by: str = "created_at",
     order_desc: bool = True,
+    fetch_emails: bool = Query(False, description="Trigger email fetching before getting tickets"),
     current_user: CurrentUser = Depends(get_current_user),
+    token: str = Depends(get_token),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Get paginated list of tickets with filters.
+    Optionally trigger email fetching first.
     """
     controller = TicketController(db)
+    
+    # Trigger email fetching if requested
+    if fetch_emails:
+        from app.controllers import EmailController
+        email_controller = EmailController(db)
+        await email_controller.trigger_email_fetch(
+            access_token=token,
+            current_user=current_user,
+            days_back=1,
+            max_emails=50,
+            folder="inbox"
+        )
+    
     return await controller.get_tickets(
         skip=skip,
         limit=limit,
@@ -212,3 +228,23 @@ async def delete_comment(
     """
     controller = TicketController(db)
     return await controller.delete_comment(comment_id, current_user)
+
+
+@router.post("/sync-frontend", response_model=MessageResponse)
+async def sync_frontend_tickets(
+    current_user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Sync tickets from database to frontend tickets2.ts file.
+    This endpoint updates the LLM-parsed tickets file used by the frontend.
+    """
+    from app.services.ticket_service import TicketService
+    
+    ticket_service = TicketService(db)
+    count = await ticket_service.update_frontend_tickets_file()
+    
+    return {
+        "message": f"Successfully synced {count} tickets to frontend file",
+        "data": {"tickets_synced": count}
+    }

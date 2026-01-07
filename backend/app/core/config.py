@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     allowed_hosts: str = Field(default="http://localhost:3000")
 
     # Server
-    host: str = Field(default="0.0.0.0")
+    host: str = Field(default="127.0.0.1")
     port: int = Field(default=8000)
     
     # Database - Supabase PostgreSQL (separate params)
@@ -38,9 +38,7 @@ class Settings(BaseSettings):
     @property
     def database_url(self) -> str:
         """Construct async database URL from parameters"""
-        from urllib.parse import quote_plus
-        password = quote_plus(self.db_password)
-        return f"postgresql+asyncpg://{self.db_user}:{password}@{self.db_host}:{self.db_port}/{self.db_name}"
+        return "sqlite+aiosqlite:///./ticket.db"
     
     @property
     def database_sync_url(self) -> str:
@@ -69,6 +67,9 @@ class Settings(BaseSettings):
     llm_temperature: float = Field(default=0.3)
     llm_max_tokens: int = Field(default=1000)
     
+    # Data Source Mode - Controls what goes into tickets2.ts
+    data_source_mode: str = Field(default="combined")  # llm, combined, dummy
+    
     # Azure OpenAI specific (only if LLM_PROVIDER=azure)
     azure_openai_endpoint: str = Field(default="")
     azure_openai_deployment: str = Field(default="")
@@ -86,6 +87,20 @@ class Settings(BaseSettings):
     def allowed_origins(self) -> List[str]:
         """Parse allowed hosts into a list"""
         return [host.strip() for host in self.allowed_hosts.split(",")]
+    
+    @property
+    def is_llm_configured(self) -> bool:
+        """Check if LLM is properly configured with API key"""
+        return bool(
+            self.llm_api_key and 
+            self.llm_api_key != "sk-your-api-key-here" and
+            self.llm_api_key != ""
+        )
+    
+    @property
+    def should_use_mock_services(self) -> bool:
+        """Determine if mock services should be used (when LLM not configured)"""
+        return not self.is_llm_configured
     
     @property
     def is_development(self) -> bool:

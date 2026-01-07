@@ -86,6 +86,151 @@ class TicketService:
             print(f"Database error: {e}. Falling back to file storage.")
             return await self._create_ticket_in_file(ticket_data, current_user)
     
+    async def create_ticket_from_email(
+        self,
+        title: str,
+        description: str,
+        category: TicketCategory,
+        priority: TicketPriority,
+        source_email_id: str,
+        source_email_from: str,
+        source_email_subject: str,
+        created_by: int,
+        llm_confidence: float = None,
+        llm_raw_response: dict = None
+    ) -> Optional[Ticket]:
+        """Create a ticket from email processing (auto-generated)"""
+        try:
+            # Generate ticket ID
+            ticket_id = await self.ticket_repo.get_next_ticket_id()
+
+            # Create ticket with email metadata
+            ticket = await self.ticket_repo.create({
+                "ticket_id": ticket_id,
+                "title": title,
+                "description": description,
+                "status": TicketStatus.OPEN,
+                "priority": priority,
+                "category": category,
+                "created_by": created_by,
+                "source_email_id": source_email_id,
+                "source_email_from": source_email_from,
+                "source_email_subject": source_email_subject,
+                "llm_confidence": llm_confidence,
+                "llm_raw_response": llm_raw_response
+            })
+
+            # Create log entry
+            await self._create_log(
+                ticket_id=ticket.id,
+                user_id=created_by,
+                log_type=LogType.EMAIL_RECEIVED,
+                action=f"Ticket {ticket_id} auto-created from email processing"
+            )
+
+            return ticket
+
+        except Exception as e:
+            print(f"Error creating ticket from email: {e}")
+            return None
+    
+    async def export_tickets_to_frontend_format(self) -> list:
+        """Export tickets from database to frontend format for tickets2.ts"""
+        try:
+            # Get all tickets with relationships
+            tickets = await self.ticket_repo.get_all_with_details()
+            
+            frontend_tickets = []
+            for ticket in tickets:
+                frontend_ticket = {
+                    'id': ticket.id,
+                    'title': ticket.title,
+                    'description': ticket.description,
+                    'status': ticket.status.value,
+                    'priority': ticket.priority.value,
+                    'assignedTo': ticket.assigned_to_user.name if ticket.assigned_to_user else 'Unassigned',
+                    'raisedBy': ticket.created_by_user.name if ticket.created_by_user else 'System',
+                    'completionBy': None,
+                    'createdOn': ticket.created_at.strftime('%Y-%m-%d'),
+                    'closedOn': ticket.resolved_at.strftime('%Y-%m-%d') if ticket.resolved_at else None,
+                    'module': ticket.category.value if ticket.category else 'OTHER',
+                    'tags': ['email-parsed', 'llm-generated'] if ticket.source_email_id else ['manual'],
+                    'source_email_id': ticket.source_email_id,  # Include for filtering
+                    'logs': [{
+                        'id': 1,
+                        'action': 'ticket_created',
+                        'performedBy': 'LLM Parser' if ticket.source_email_id else 'Manual',
+                        'timestamp': ticket.created_at.strftime('%Y-%m-%dT%H:%M:%S'),
+                        'details': f'Auto-created from email (Confidence: {ticket.llm_confidence:.1%})' if ticket.llm_confidence else 'Manually created'
+                    }],
+                    'comments': []
+                }
+                frontend_tickets.append(frontend_ticket)
+            
+            return frontend_tickets
+            
+        except Exception as e:
+            print(f"Error exporting tickets to frontend format: {e}")
+            return []
+    
+    async def update_frontend_tickets_file(self):
+        """Update the tickets2.ts file with current database tickets based on DATA_SOURCE_MODE"""
+        try:
+            import json
+            import os
+            from app.core.config import settings
+            
+            # Get all tickets with details
+            all_tickets = await self.export_tickets_to_frontend_format()
+            
+            # Filter tickets based on DATA_SOURCE_MODE
+            if settings.data_source_mode == "llm":
+                # Only LLM-parsed tickets (those with source_email_id)
+                filtered_tickets = [t for t in all_tickets if t.get('source_email_id')]
+            elif settings.data_source_mode == "combined":
+                # All tickets (both dummy and LLM)
+                filtered_tickets = all_tickets
+            elif settings.data_source_mode == "dummy":
+                # Only dummy tickets (those without source_email_id)
+                filtered_tickets = [t for t in all_tickets if not t.get('source_email_id')]
+            else:
+                # Default to combined
+                filtered_tickets = all_tickets
+            
+            # Create the TypeScript content
+            mode_description = {
+                "llm": "LLM-parsed tickets only",
+                "combined": "Combined dummy + LLM tickets", 
+                "dummy": "Dummy/sample tickets only"
+            }.get(settings.data_source_mode, "Combined mode")
+            
+            ts_content = f"""// ============================================
+// TICKETS DATA - {mode_description.upper()}
+// ============================================
+// Mode: {settings.data_source_mode}
+// Auto-generated from database on {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
+// Total tickets: {len(filtered_tickets)}
+// Data source mode controlled by .env DATA_SOURCE_MODE
+
+import {{ Ticket }} from '@/types';
+
+export const ticketsData: Ticket[] = {json.dumps(filtered_tickets, indent=2)};
+"""
+            
+            # Write to frontend file
+            frontend_path = os.path.join(os.path.dirname(__file__), '../../../frontend-up/src/data/tickets2.ts')
+            os.makedirs(os.path.dirname(frontend_path), exist_ok=True)
+            
+            with open(frontend_path, 'w', encoding='utf-8') as f:
+                f.write(ts_content)
+            
+            print(f"Updated tickets2.ts with {len(filtered_tickets)} tickets (mode: {settings.data_source_mode})")
+            return len(filtered_tickets)
+            
+        except Exception as e:
+            print(f"Error updating frontend tickets file: {e}")
+            return 0
+    
     async def get_ticket(self, ticket_id: int) -> Optional[TicketDetailResponse]:
         """Get ticket with all details"""
         ticket = await self.ticket_repo.get_with_details(ticket_id)

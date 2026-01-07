@@ -21,7 +21,9 @@ class EmailController:
     
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.email_processor = EmailProcessor(db)
+        # Automatically use mock services if LLM not configured
+        use_mock = settings.should_use_mock_services
+        self.email_processor = EmailProcessor(db, use_mock=use_mock)
         self.email_service = EmailService(db)
     
     async def trigger_email_fetch(
@@ -61,6 +63,15 @@ class EmailController:
             auto_create_tickets=True,
             created_by_user_id=current_user.id
         )
+        
+        # Sync tickets to frontend after processing
+        try:
+            from app.services.ticket_service import TicketService
+            ticket_service = TicketService(self.db)
+            synced_count = await ticket_service.update_frontend_tickets_file()
+            print(f"✅ Synced {synced_count} tickets to frontend after email processing")
+        except Exception as e:
+            print(f"⚠️  Failed to sync tickets to frontend: {e}")
         
         return {
             "message": "Email processing completed",

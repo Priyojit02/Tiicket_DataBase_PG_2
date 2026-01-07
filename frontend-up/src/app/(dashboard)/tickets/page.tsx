@@ -24,6 +24,7 @@ import {
 } from '@/components/ui';
 import { formatDate } from '@/lib/utils';
 import { exportToExcel, exportToCSV } from '@/lib/export-service';
+import { getCurrentDataSource } from '@/lib/ticket-service';
 import { Ticket, TicketFilters } from '@/types';
 
 const statusOptions = [
@@ -71,6 +72,22 @@ export default function TicketsPage() {
         toggleSort,
     } = useTickets();
     
+    const currentDataSource = getCurrentDataSource();
+    
+    const getDataSourceInfo = () => {
+        switch (currentDataSource) {
+            case 'normal':
+                return { label: 'Sample Data', color: 'bg-gray-100 text-gray-800', icon: '📊' };
+            case 'llm':
+                return { label: 'LLM Data', color: 'bg-blue-100 text-blue-800', icon: '🤖' };
+            case 'combined':
+            default:
+                return { label: 'Combined Data', color: 'bg-green-100 text-green-800', icon: '🔄' };
+        }
+    };
+    
+    const dataSourceInfo = getDataSourceInfo();
+    
     // Handle row click
     const handleRowClick = useCallback((ticket: Ticket) => {
         router.push(`/tickets/${ticket.id}`);
@@ -94,11 +111,24 @@ export default function TicketsPage() {
         <div className="space-y-6">
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Tickets</h1>
-                    <p className="text-gray-500 mt-1">
-                        {filteredTickets.length} tickets found
-                    </p>
+                <div className="flex items-center gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900">Tickets</h1>
+                        <p className="text-gray-500 mt-1">
+                            {filteredTickets.length} tickets found
+                        </p>
+                    </div>
+                    <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${dataSourceInfo.color}`}>
+                        <span>{dataSourceInfo.icon}</span>
+                        <span>{dataSourceInfo.label}</span>
+                        <Link 
+                            href="/settings" 
+                            className="ml-1 text-xs underline hover:no-underline"
+                            title="Change data source in settings"
+                        >
+                            ⚙️
+                        </Link>
+                    </div>
                 </div>
                 <div className="flex items-center gap-2">
                     <Button

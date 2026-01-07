@@ -407,6 +407,14 @@ class LLMService:
     
     def __init__(self, db: AsyncSession, provider: str = None, model: str = None):
         self.db = db
+        
+        # Check if LLM is properly configured
+        if not settings.is_llm_configured:
+            raise ValueError(
+                "LLM service requires proper API key configuration. "
+                "Please set LLM_API_KEY in your .env file or use MockLLMService for testing."
+            )
+        
         self.llm_provider = get_llm_provider(provider=provider, model=model)
         print(f"LLM Service initialized: {self.llm_provider.provider_name} ({self.llm_provider.model})")
     
@@ -573,7 +581,7 @@ class MockLLMService:
             confidence=0.8 if is_sap else 0.2,
             detected_category=category if is_sap else None,
             suggested_title=f"Support: {subject[:50]}",
-            suggested_priority=TicketPriorityEnum.Medium,
+            suggested_priority=TicketPriorityEnum.MEDIUM,
             key_points=["Mock analysis", "Testing mode"],
             raw_response={"mock": True}
         )

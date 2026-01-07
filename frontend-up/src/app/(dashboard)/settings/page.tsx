@@ -124,6 +124,24 @@ export default function SettingsPage() {
                 </div>
             </Card>
             
+            {/* Data Source Info */}
+            <Card className="p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Data Source</h2>
+                <div className="space-y-4">
+                    <div className="p-4 bg-blue-50 rounded-lg">
+                        <p className="text-sm text-blue-800 mb-2">
+                            <strong>Data source is controlled by frontend-up/.env.local</strong>
+                        </p>
+                        <p className="text-xs text-blue-600">
+                            Current mode: <code className="bg-blue-100 px-1 rounded">USE_DB={process.env.USE_DB || 'combined'}</code>
+                        </p>
+                        <p className="text-xs text-blue-600 mt-1">
+                            To change data source, edit the USE_DB variable in frontend-up/.env.local
+                        </p>
+                    </div>
+                </div>
+            </Card>
+            
             {/* Account Info */}
             <Card className="p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Account Information</h2>
