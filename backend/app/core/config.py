@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     email_password: str = Field(default="")
     email_folder: str = Field(default="INBOX")
     email_fetch_days: int = Field(default=1)
+    email_address: str = Field(default="ratnakar@dev365pwc.com")
     
     # LLM Configuration - Dynamic (just set provider name and API key)
     llm_provider: str = Field(default="openai")  # openai, anthropic, azure, ollama, groq, together, google
