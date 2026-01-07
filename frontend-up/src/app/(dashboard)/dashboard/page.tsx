@@ -12,9 +12,16 @@ import { useAnalytics } from '@/hooks/useAnalytics';
 import { StatsCard, Card, CardHeader, CardTitle, CardContent, StatusBadge, PriorityBadge } from '@/components/ui';
 import { formatDate, getDaysLabel } from '@/lib/utils';
 import { getCurrentDataSource } from '@/lib/ticket-service';
+import { emailService } from '@/lib/api-service';
 
 export default function DashboardPage() {
-    const { tickets, isLoading } = useTickets();
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [syncMessage, setSyncMessage] = useState<string | null>(null);
+    const [isAutoSyncEnabled, setIsAutoSyncEnabled] = useState(
+        process.env.NEXT_PUBLIC_AUTO_SYNC_ENABLED === 'true' // ← READ FROM ENV
+    );
+    const [autoSyncInterval, setAutoSyncInterval] = useState<NodeJS.Timeout | null>(null);
+    const { tickets, isLoading, loadTickets } = useTickets();
     const { 
         analytics, 
         overdueTickets, 
@@ -23,6 +30,46 @@ export default function DashboardPage() {
     } = useAnalytics({ tickets });
     
     const currentDataSource = getCurrentDataSource();
+    
+    // Initial sync on page load (one time)
+    useEffect(() => {
+        const initialSync = async () => {
+            // Small delay to let the page load first
+            setTimeout(() => {
+                handleSyncEmails(true);
+            }, 2000);
+        };
+        
+        initialSync();
+    }, []); // Empty dependency array = runs once on mount
+    
+    // Auto-sync effect
+    useEffect(() => {
+        if (isAutoSyncEnabled) {
+            // Start auto-sync every 30 seconds (reduced frequency)
+            const interval = setInterval(() => {
+                handleSyncEmails(true); // true indicates auto-sync
+            }, 30000); // 30 seconds
+            
+            setAutoSyncInterval(interval);
+            
+            // Initial sync when auto-sync is enabled
+            handleSyncEmails(true);
+        } else {
+            // Stop auto-sync
+            if (autoSyncInterval) {
+                clearInterval(autoSyncInterval);
+                setAutoSyncInterval(null);
+            }
+        }
+        
+        // Cleanup on unmount
+        return () => {
+            if (autoSyncInterval) {
+                clearInterval(autoSyncInterval);
+            }
+        };
+    }, [isAutoSyncEnabled]);
     
     const getDataSourceInfo = () => {
         switch (currentDataSource) {
@@ -37,6 +84,46 @@ export default function DashboardPage() {
     };
     
     const dataSourceInfo = getDataSourceInfo();
+    
+    const handleSyncEmails = async (isAutoSync = false) => {
+        // Skip if already syncing
+        if (isSyncing) return;
+        
+        setIsSyncing(true);
+        if (!isAutoSync) {
+            setSyncMessage(null);
+        }
+        
+        try {
+            const result = await emailService.triggerEmailFetch();
+            
+            if (!isAutoSync) {
+                setSyncMessage(`Sync completed! Processed ${result.processed_emails || 0} emails, created ${result.created_tickets || 0} tickets.`);
+                // Refresh the data for manual sync
+                window.location.reload();
+            } else {
+                // For auto-sync, refresh data without page reload
+                const processed = result.processed_emails || 0;
+                const created = result.created_tickets || 0;
+                if (processed > 0 || created > 0) {
+                    setSyncMessage(`🔄 Auto-sync: ${processed} emails processed, ${created} tickets created (${new Date().toLocaleTimeString()})`);
+                    // Refresh ticket data
+                    await loadTickets();
+                } else {
+                    setSyncMessage(`✅ Auto-sync: No new emails (${new Date().toLocaleTimeString()})`);
+                }
+            }
+        } catch (error) {
+            console.error('Sync failed:', error);
+            if (!isAutoSync) {
+                setSyncMessage('Sync failed. Please try again.');
+            } else {
+                setSyncMessage(`Auto-sync failed at ${new Date().toLocaleTimeString()}`);
+            }
+        } finally {
+            setIsSyncing(false);
+        }
+    };
     
     if (isLoading) {
         return (
@@ -69,16 +156,88 @@ export default function DashboardPage() {
                         </Link>
                     </div>
                 </div>
-                <Link
-                    href="/tickets/new"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#D04A02] text-white rounded-lg hover:bg-[#b84102] transition-colors"
-                >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    New Ticket
-                </Link>
+                <div className="flex gap-3">
+                    {/* Auto-Sync Toggle Button */}
+                    <button
+                        onClick={() => setIsAutoSyncEnabled(!isAutoSyncEnabled)}
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                            isAutoSyncEnabled 
+                                ? 'bg-green-600 text-white hover:bg-green-700' 
+                                : 'bg-gray-600 text-white hover:bg-gray-700'
+                        }`}
+                        title={isAutoSyncEnabled ? 'Disable auto-sync (every 10s)' : 'Enable auto-sync (every 10s)'}
+                    >
+                        {isAutoSyncEnabled ? (
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
+                            </svg>
+                        ) : (
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        )}
+                        {isAutoSyncEnabled ? 'Auto-Sync ON' : 'Auto-Sync OFF'}
+                    </button>
+                    
+                    {/* Manual Sync Button */}
+                    <button
+                        onClick={() => handleSyncEmails(false)}
+                        disabled={isSyncing}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {isSyncing ? (
+                            <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        ) : (
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        )}
+                        {isSyncing ? 'Syncing...' : 'Sync Emails'}
+                    </button>
+                    <Link
+                        href="/tickets/new"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-[#D04A02] text-white rounded-lg hover:bg-[#b84102] transition-colors"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        New Ticket
+                    </Link>
+                </div>
             </div>
+            
+            {/* Sync Message */}
+            {syncMessage && (
+                <div className={`p-4 rounded-lg ${
+                    syncMessage.includes('failed') 
+                        ? 'bg-red-50 border border-red-200 text-red-800' 
+                        : syncMessage.includes('Auto-sync') 
+                            ? 'bg-blue-50 border border-blue-200 text-blue-800'
+                            : 'bg-green-50 border border-green-200 text-green-800'
+                }`}>
+                    <div className="flex items-center gap-2">
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            {syncMessage.includes('failed') ? (
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                            ) : syncMessage.includes('Auto-sync') ? (
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                            ) : (
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            )}
+                        </svg>
+                        <span className="font-medium">{syncMessage}</span>
+                        {isAutoSyncEnabled && syncMessage.includes('Auto-sync') && (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                                Auto-sync active (30s intervals)
+                            </span>
+                        )}
+                    </div>
+                </div>
+            )}
             
             {/* Stats Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

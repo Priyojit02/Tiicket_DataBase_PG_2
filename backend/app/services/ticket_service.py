@@ -79,6 +79,10 @@ class TicketService:
 
             # Reload with relationships
             ticket = await self.ticket_repo.get_with_details(ticket.id)
+            
+            # Update frontend tickets file after creation
+            await self.update_frontend_tickets_file()
+            
             return TicketResponse.model_validate(ticket)
 
         except Exception as e:
@@ -127,6 +131,9 @@ class TicketService:
                 log_type=LogType.EMAIL_RECEIVED,
                 action=f"Ticket {ticket_id} auto-created from email processing"
             )
+
+            # Update frontend tickets file after email ticket creation
+            await self.update_frontend_tickets_file()
 
             return ticket
 
@@ -352,11 +359,19 @@ export const ticketsData: Ticket[] = {json.dumps(filtered_tickets, indent=2)};
         
         # Reload with relationships
         updated_ticket = await self.ticket_repo.get_with_details(ticket_id)
+        
+        # Update frontend tickets file after update
+        await self.update_frontend_tickets_file()
+        
         return TicketResponse.model_validate(updated_ticket)
     
     async def delete_ticket(self, ticket_id: int) -> bool:
         """Delete a ticket"""
-        return await self.ticket_repo.delete(ticket_id)
+        result = await self.ticket_repo.delete(ticket_id)
+        if result:
+            # Update frontend tickets file after deletion
+            await self.update_frontend_tickets_file()
+        return result
     
     async def add_comment(
         self,

@@ -10,7 +10,7 @@ from app.routes.email_routes import router as email_router
 
 def register_routes(app):
     """Register all routes with the FastAPI app"""
-    api_router = APIRouter(prefix="")
+    api_router = APIRouter(prefix="/api/v1")
     
     api_router.include_router(auth_router)
     api_router.include_router(ticket_router)

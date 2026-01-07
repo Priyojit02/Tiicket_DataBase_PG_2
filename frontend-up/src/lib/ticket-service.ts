@@ -17,30 +17,30 @@ import { initialTickets } from '@/data/tickets';
 // Controlled by frontend-up/.env.local USE_DB variable
 
 // Function to safely load LLM-parsed tickets
-function loadLLMTickets(): Ticket[] {
+async function loadLLMTickets(): Promise<Ticket[]> {
     try {
-        // This will work at runtime but TypeScript might complain
-        const tickets2Module = require('@/data/tickets2');
+        // Use dynamic import for Next.js compatibility
+        const tickets2Module = await import('@/data/tickets2');
         return tickets2Module.ticketsData || [];
     } catch (error) {
         // tickets2.ts not available, return empty array
-        console.log('ℹ️ tickets2.ts not found, using only initial tickets');
+        console.log('ℹ️ tickets2.ts not found or failed to load, using only initial tickets');
         return [];
     }
 }
 
 // Get current data source mode from .env
 export function getCurrentDataSource(): 'normal' | 'llm' | 'combined' {
-    return (process.env.USE_DB as 'normal' | 'llm' | 'combined') || 'combined';
+    return (process.env.NEXT_PUBLIC_DATA_SOURCE as 'normal' | 'llm' | 'combined') || 'combined';
 }
 
 // Load tickets based on .env configuration
-function loadTickets(): Ticket[] {
-    const llmTickets = loadLLMTickets();
+async function loadTickets(): Promise<Ticket[]> {
+    const llmTickets = await loadLLMTickets();
     const hasLLMTickets = llmTickets.length > 0;
     
     // Get data source mode from .env
-    const dataSourceMode = process.env.USE_DB || 'combined';
+    const dataSourceMode = process.env.NEXT_PUBLIC_DATA_SOURCE || 'combined';
     
     switch (dataSourceMode) {
         case 'normal':
@@ -62,29 +62,24 @@ function loadTickets(): Ticket[] {
             return [...initialTickets, ...llmTickets];
     }
 }
-            console.log('🤖 Using LLM data mode (user preference)');
-            if (hasLLMTickets) {
-                return [...llmTickets];
-            } else {
-                console.log('⚠️ No LLM tickets found, falling back to dummy data');
-                return [...initialTickets];
-            }
-
-        case 'combined':
-        default:
-            console.log('🔄 Using COMBINED data mode (user preference)');
-            return [...initialTickets, ...llmTickets];
-    }
-}
 
 // Load LLM tickets safely
-const llmParsedTickets = loadLLMTickets();
+let llmParsedTickets: Ticket[] = [];
 
 // Flag to use mock data (set to false to use real backend)
 const USE_MOCK_DATA = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
 
 // Load tickets based on data source configuration
-let mockTickets: Ticket[] = loadTickets();
+let mockTickets: Ticket[] = [];
+
+// Initialize tickets data
+async function initializeTickets() {
+    llmParsedTickets = await loadLLMTickets();
+    mockTickets = await loadTickets();
+}
+
+// Initialize on module load
+initializeTickets().catch(console.error);
 
 /**
  * Get all tickets from backend

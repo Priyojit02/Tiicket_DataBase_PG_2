@@ -29,7 +29,10 @@ const categoryOptions = [
     { value: 'QM', label: 'QM - Quality Management' },
     { value: 'PM', label: 'PM - Plant Maintenance' },
     { value: 'PS', label: 'PS - Project System' },
-    { value: 'Other', label: 'Other' },
+    { value: 'BW', label: 'BW - Business Warehouse' },
+    { value: 'ABAP', label: 'ABAP - Development' },
+    { value: 'BASIS', label: 'BASIS - System Administration' },
+    { value: 'OTHER', label: 'Other' },
 ];
 
 export default function NewTicketPage() {
@@ -40,7 +43,7 @@ export default function NewTicketPage() {
         title: '',
         description: '',
         priority: 'Medium' as TicketPriority,
-        category: 'Other' as SAPModule,
+        category: 'OTHER' as SAPModule,
         completionBy: '',
     });
     const [errors, setErrors] = useState<Record<string, string>>({});

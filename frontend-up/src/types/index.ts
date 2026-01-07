@@ -85,11 +85,11 @@ export interface Ticket {
     emailSource?: EmailSource;
 }
 
-export type TicketStatus = 'Open' | 'In Progress' | 'Completed' | 'On Hold' | 'Cancelled';
+export type TicketStatus = 'Open' | 'In Progress' | 'Awaiting Info' | 'Resolved' | 'Closed';
 
 export type TicketPriority = 'Low' | 'Medium' | 'High' | 'Critical';
 
-export type SAPModule = 'MM' | 'PP' | 'FICO' | 'SD' | 'HCM' | 'WM' | 'QM' | 'PM' | 'PS' | 'Other';
+export type SAPModule = 'MM' | 'SD' | 'FICO' | 'PP' | 'HCM' | 'PM' | 'QM' | 'WM' | 'PS' | 'BW' | 'ABAP' | 'BASIS' | 'OTHER';
 
 // Attachment Types
 export interface Attachment {

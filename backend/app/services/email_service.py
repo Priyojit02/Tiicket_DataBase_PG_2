@@ -47,11 +47,23 @@ class EmailService:
             # Build Microsoft Graph API URL
             graph_url = f"https://graph.microsoft.com/v1.0/me/mailFolders/{folder}/messages"
             
+            # Use appropriate date field based on folder
+            if folder.lower() == "sentitems":
+                # For sent items, filter by sent date
+                date_filter = f"sentDateTime ge {since_date}"
+                order_by = "sentDateTime desc"
+                select_fields = "id,subject,bodyPreview,body,from,toRecipients,sentDateTime,hasAttachments,internetMessageId"
+            else:
+                # For inbox and other folders, filter by received date
+                date_filter = f"receivedDateTime ge {since_date}"
+                order_by = "receivedDateTime desc"
+                select_fields = "id,subject,bodyPreview,body,from,toRecipients,receivedDateTime,hasAttachments,internetMessageId"
+            
             params = {
                 "$top": max_emails,
-                "$orderby": "receivedDateTime desc",
-                "$filter": f"receivedDateTime ge {since_date}",
-                "$select": "id,subject,bodyPreview,body,from,toRecipients,receivedDateTime,hasAttachments,internetMessageId"
+                "$orderby": order_by,
+                "$filter": date_filter,
+                "$select": select_fields
             }
             
             async with httpx.AsyncClient() as client:
@@ -92,9 +104,15 @@ class EmailService:
                     body_content = body_data.get("content", "")
                     body_type = body_data.get("contentType", "text")
                     
-                    # Parse received date
-                    received_str = msg.get("receivedDateTime")
-                    received_at = datetime.fromisoformat(received_str.replace("Z", "+00:00")) if received_str else datetime.utcnow()
+                    # Parse date (sent or received based on folder)
+                    if folder.lower() == "sentitems":
+                        date_str = msg.get("sentDateTime")
+                        date_field = "sent_at"
+                    else:
+                        date_str = msg.get("receivedDateTime")
+                        date_field = "received_at"
+                    
+                    email_date = datetime.fromisoformat(date_str.replace("Z", "+00:00")) if date_str else datetime.utcnow()
                     
                     # Store email in database
                     email_source = await self.email_repo.create({
@@ -104,7 +122,7 @@ class EmailService:
                         "subject": msg.get("subject", "(No Subject)"),
                         "body_text": body_content if body_type == "text" else msg.get("bodyPreview", ""),
                         "body_html": body_content if body_type == "html" else None,
-                        "received_at": received_at,
+                        "received_at": email_date,  # Store in received_at field regardless
                         "has_attachments": msg.get("hasAttachments", False),
                         "raw_headers": None
                     })

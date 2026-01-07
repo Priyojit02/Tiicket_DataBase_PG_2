@@ -371,7 +371,7 @@ export const emailsApi = {
    * Trigger email fetch
    */
   async triggerFetch(params: { days_back?: number; max_emails?: number } = {}): Promise<any> {
-    return api.post(API_ENDPOINTS.emails.fetch, null, true);
+    return api.post(API_ENDPOINTS.emails.fetch, null, true, params);
   },
 
   /**
